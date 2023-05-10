@@ -1,3 +1,25 @@
+# About this fork
+
+This is a very sketchy edit to setup.py to get lensingbiases to compile for Python 3. I haven't changed anything else so most of the python code might not work, but this way we can call the FORTRAN code from python 3. 
+
+
+To compile
+```bash
+python setup.py build_ext -i
+pip install -e . --user
+```
+
+
+And to call the N0 and N1 bias calculation code
+```python
+from lensingbiases._lensing_biases import lensingbiases as bias
+```
+Where now we have access to `bias.compute_n0` and `bias.compute_n1` part of the FORTRAN code.
+
+
+Below is the old README
+
+
 Lensingbiases
 ==
 

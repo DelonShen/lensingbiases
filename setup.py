@@ -1,61 +1,79 @@
 #!/usr/bin/env python
-# Copyright (C) 2016 Lewis, Peloton
-"""Distutils based setup script for Lensingbiases.
 
-This uses Distutils (http://python.org/sigs/distutils-sig/) the standard
-python mechanism for installing packages. To compile Fortran code for internal
-computation inplace, just type the command (see README also):
 
-    python setup.py build_ext --inplace --fcompiler=gfortran
 
-For most purposes, you do not need to do anything else.
-For the easiest installation just type the command (you'll probably need
-root privileges for that):
-
-    python setup.py install
-
-This will install the library in the default location. For instructions on
-how to customize the install procedure read the output of:
-
-    python setup.py --help install
-
-In addition, there are some other commands:
-
-    python setup.py clean -> will clean all trash (*.pyc and stuff)
-    python setup.py test  -> will run the complete test suite
-    python setup.py bench -> will run the complete benchmark suite
-    python setup.py audit -> will run pyflakes checker on source code
-
-To get a full list of avaiable commands, read the output of:
-
-    python setup.py --help-commands
-"""
+import setuptools
+from distutils.errors import DistutilsError
+from numpy.distutils.core import setup, Extension, build_ext, build_src
+from distutils.sysconfig import get_config_var, get_config_vars
+import versioneer
+import os, sys
+import subprocess as sp
 import numpy as np
-import distutils
+build_ext = build_ext.build_ext
+build_src = build_src.build_src
 
-def configuration(parent_package='',top_path=None):
-    from numpy.distutils.misc_util import Configuration
-    config = Configuration('',parent_package,top_path)
+with open('README.md') as readme_file:
+    readme = readme_file.read()
 
-    if distutils.version.StrictVersion(np.version.version) > distutils.version.StrictVersion('1.6.1'):
-        config.add_extension('LensingBiases_f', ['LensingBiases.f90'],
-                             libraries=['gomp'], f2py_options=[],
-                             extra_f90_compile_args=['-ffixed-line-length-1000', '-fopenmp', '-O3'],
-                             extra_compile_args=[''], extra_link_args=[],)
-    else:
-        config.add_extension('LensingBiases_f', ['LensingBiases.f90'],
-                             libraries=['gomp'], f2py_options=[],
-                             extra_compile_args=['-fopenmp'], extra_link_args=[],)
 
-    return config
+requirements       = []
+setup_requirements = []
+test_requirements  = []
+
+compile_opts = {
+    'extra_compile_args': ['-std=c99','-fopenmp', '-Wno-strict-aliasing', '-g'],
+    'extra_f90_compile_args': ['-fopenmp', '-Wno-conversion', '-Wno-tabs'],
+    'extra_link_args': ['-fopenmp', '-g']
+    }
+
+fcflags = os.getenv('FCFLAGS')
+if fcflags is None or fcflags.strip() == '':
+    fcflags = ['-O3']
+else:
+    print('User supplied fortran flags: ', fcflags)
+    print('These will supersede other optimization flags.')
+    fcflags = fcflags.split()
+    
+compile_opts['extra_f90_compile_args'].extend(fcflags)
+
+    
+
+
+class CustomBuild(build_ext):
+    def run(self):
+        # Then let setuptools do its thing.
+        return build_ext.run(self)
+
+class CustomSrc(build_src):
+    def run(self):
+        # Then let setuptools do its thing.
+        return build_src.run(self)
+
+class CustomEggInfo(setuptools.command.egg_info.egg_info):
+    def run(self):
+        return setuptools.command.egg_info.egg_info.run(self)   
+
+# Cascade your overrides here.
+cmdclass = {
+    'build_ext': CustomBuild,
+    'build_src': CustomSrc,
+    'egg_info': CustomEggInfo,
+}
+cmdclass = versioneer.get_cmdclass(cmdclass)
+
 
 if __name__ == "__main__":
-    from numpy.distutils.core import setup
-
     setup(name='lensingbiases',
-        configuration=configuration,
         version='1.0.0',
         author='Antony Lewis, Julien Peloton',
         author_email='j.peloton@sussex.ac.uk',
         packages=['lensingbiases'],
+        ext_modules=[
+            Extension('lensingbiases._lensing_biases',
+                sources=['LensingBiases.f90'],
+                **compile_opts),
+        ],
+        zip_safe=False,
+        cmdclass=cmdclass,
         description='Compute lensing biases N0 and N1',)
